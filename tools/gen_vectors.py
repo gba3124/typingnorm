@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from typingnorm import check  # noqa: E402
+from typingnorm import Session, all_scores, check  # noqa: E402
 from typingnorm.simulate import Clock, HumanTypist, NullMouse, RecordKeyboard  # noqa: E402
 
 MIN = 20   # 向量用的擊鍵門檻，讓案例保持精簡
@@ -128,7 +128,40 @@ def build():
     return {
         "note": "Python 與 JS 兩份實作的共用測試向量。由 tools/gen_vectors.py 產生。",
         "cases": cases,
+        "metric_cases": metric_cases(),
     }
+
+
+def metric_cases():
+    """指標的共用案例。八個指標各自對照當地認證機構的公開門檻。"""
+    out = []
+
+    def add(name, why, lang, prompt, typed=None, seconds=60, keystrokes=None, events=()):
+        s = Session(lang, "", "", "", prompt, typed if typed is not None else prompt,
+                    seconds, keystrokes if keystrokes is not None else len(prompt),
+                    list(events))
+        out.append({
+            "name": name, "why": why, "lang": lang,
+            "sample": {"prompt": s.prompt, "typed": s.typed, "seconds": s.seconds,
+                       "keystrokes": s.keystrokes,
+                       "events": [list(e) for e in s.events]},
+            "expect": {r["metric"]: r["value"] for r in all_scores(s)},
+        })
+
+    add("ssc_english_35wpm", "SSC CHSL 英文 35 WPM 的正式單位是 10,500 KDPH",
+        "en", "x" * 175)
+    add("ssc_hindi_30wpm", "印地文 30 WPM 等於 9,000 KDPH", "hi", "x" * 150)
+    add("tqc_professional", "TQC 專業級是每分鐘 80 字", "zh-TW", "字" * 80, keystrokes=320)
+    add("tqc_error_deduction", "每錯一次扣該列 0.5 字：76 正確、4 錯 → 74",
+        "zh-TW", "字" * 80, typed="字" * 76 + "錯" * 4, keystrokes=320)
+    add("tqc_invalid_at_10pct", "錯誤率達 10% 該次成績不予計算",
+        "zh-TW", "字" * 80, typed="字" * 72 + "錯" * 8, keystrokes=320)
+    add("korean_tasu_counts_jamo", "한 = ㅎ+ㅏ+ㄴ 三打，只能從擊鍵流算",
+        "ko", "한" * 20, keystrokes=60,
+        events=[(i * 100.0, "D", "KeyR", c) for i, c in enumerate("ㅎㅏㄴ" * 20)])
+    add("thai_divides_by_four", "泰文一個詞是四個字元，不是英文慣例的五個",
+        "th", "ก" * 140)
+    return out
 
 
 def main():

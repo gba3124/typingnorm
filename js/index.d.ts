@@ -39,3 +39,36 @@ export declare function check(
   events: KeyEvent[],
   options?: { minKeystrokes?: number },
 ): Report;
+
+export interface Sample {
+  prompt: string;
+  typed: string;
+  seconds: number;
+  keystrokes: number;
+  events?: KeyEvent[];
+  jamoKeys?: number;
+}
+
+export type MetricId =
+  | "cpm_tqc" | "cpm_jp" | "tasu" | "kdph_ssc"
+  | "wpm_net_5" | "wpm_4" | "kpm" | "cpm_raw";
+
+export interface Score {
+  metric: MetricId;
+  value: number;
+  unit: string;
+  /** true 表示出自國家級認證機構，介面才可以顯示「合格」「專業級」 */
+  authoritative: boolean;
+  note: string;
+}
+
+export declare const METRICS: Record<MetricId, {
+  unit: string; authoritative: boolean; note: string;
+  fn: (s: Sample) => number;
+}>;
+export declare const METRIC_IDS: MetricId[];
+export declare const DEFAULT_METRIC: Record<string, MetricId>;
+export declare function score(sample: Sample, lang: string, metric?: MetricId): Score;
+export declare function allScores(sample: Sample, lang: string): Score[];
+export declare function accuracy(sample: Sample): number;
+export declare function tqcGrade(cpm: number): string | null;

@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { check } from "./index.js";
+import { check, score } from "./index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { cases } = JSON.parse(readFileSync(join(here, "..", "vectors.json"), "utf8"));
@@ -38,6 +38,27 @@ for (const c of cases) {
           `${c.name}.${k}: JS ${got} vs Python ${want}`,
         );
       }
+    }
+  });
+}
+
+// 指標：兩邊對同一個樣本必須算出相同數字
+const metricCases = JSON.parse(
+  readFileSync(join(here, "..", "vectors.json"), "utf8"),
+).metric_cases ?? [];
+
+test("vectors.json 有指標案例", () => {
+  assert.ok(metricCases.length >= 7, `只有 ${metricCases.length} 個`);
+});
+
+for (const c of metricCases) {
+  test(`指標向量：${c.name}`, () => {
+    for (const [metric, want] of Object.entries(c.expect)) {
+      const got = score(c.sample, c.lang, metric).value;
+      assert.ok(
+        Math.abs(got - want) <= 0.05,
+        `${c.name}.${metric}: JS ${got} vs Python ${want}（${c.why}）`,
+      );
     }
   });
 }

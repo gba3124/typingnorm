@@ -1,7 +1,7 @@
 {
   "name": "typingnorm",
-  "version": "0.1.0",
-  "description": "Tell whether keystrokes came from a human. Three rules, each with a false-positive rate measured on 2,245 real typists. Zero dependencies.",
+  "version": "0.2.0",
+  "description": "Tell whether keystrokes came from a human, and score typing speed with each locale's own standard. Zero dependencies.",
   "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
@@ -14,6 +14,7 @@
   "sideEffects": false,
   "files": [
     "index.js",
+    "metrics.js",
     "index.d.ts",
     "README.md",
     "LICENSE"
@@ -34,5 +35,7 @@
     "human-verification"
   ],
   "license": "MIT",
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

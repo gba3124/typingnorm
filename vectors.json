@@ -3268,5 +3268,522 @@
     "n_keystrokes": 5
    }
   }
+ ],
+ "metric_cases": [
+  {
+   "name": "ssc_english_35wpm",
+   "why": "SSC CHSL 英文 35 WPM 的正式單位是 10,500 KDPH",
+   "lang": "en",
+   "sample": {
+    "prompt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "typed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "seconds": 60,
+    "keystrokes": 175,
+    "events": []
+   },
+   "expect": {
+    "kpm": 175.0,
+    "wpm_net_5": 35.0,
+    "kdph_ssc": 10500.0,
+    "cpm_tqc": 175.0,
+    "cpm_jp": 175.0,
+    "tasu": 175.0,
+    "wpm_4": 43.8,
+    "cpm_raw": 175.0
+   }
+  },
+  {
+   "name": "ssc_hindi_30wpm",
+   "why": "印地文 30 WPM 等於 9,000 KDPH",
+   "lang": "hi",
+   "sample": {
+    "prompt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "typed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "seconds": 60,
+    "keystrokes": 150,
+    "events": []
+   },
+   "expect": {
+    "kpm": 150.0,
+    "wpm_net_5": 30.0,
+    "kdph_ssc": 9000.0,
+    "cpm_tqc": 150.0,
+    "cpm_jp": 150.0,
+    "tasu": 150.0,
+    "wpm_4": 37.5,
+    "cpm_raw": 150.0
+   }
+  },
+  {
+   "name": "tqc_professional",
+   "why": "TQC 專業級是每分鐘 80 字",
+   "lang": "zh-TW",
+   "sample": {
+    "prompt": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字",
+    "typed": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字",
+    "seconds": 60,
+    "keystrokes": 320,
+    "events": []
+   },
+   "expect": {
+    "kpm": 320.0,
+    "wpm_net_5": 16.0,
+    "kdph_ssc": 19200.0,
+    "cpm_tqc": 80.0,
+    "cpm_jp": 80.0,
+    "tasu": 320.0,
+    "wpm_4": 20.0,
+    "cpm_raw": 80.0
+   }
+  },
+  {
+   "name": "tqc_error_deduction",
+   "why": "每錯一次扣該列 0.5 字：76 正確、4 錯 → 74",
+   "lang": "zh-TW",
+   "sample": {
+    "prompt": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字",
+    "typed": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字錯錯錯錯",
+    "seconds": 60,
+    "keystrokes": 320,
+    "events": []
+   },
+   "expect": {
+    "kpm": 320.0,
+    "wpm_net_5": 14.4,
+    "kdph_ssc": 19200.0,
+    "cpm_tqc": 74.0,
+    "cpm_jp": 72.0,
+    "tasu": 320.0,
+    "wpm_4": 18.0,
+    "cpm_raw": 76.0
+   }
+  },
+  {
+   "name": "tqc_invalid_at_10pct",
+   "why": "錯誤率達 10% 該次成績不予計算",
+   "lang": "zh-TW",
+   "sample": {
+    "prompt": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字",
+    "typed": "字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字字錯錯錯錯錯錯錯錯",
+    "seconds": 60,
+    "keystrokes": 320,
+    "events": []
+   },
+   "expect": {
+    "kpm": 320.0,
+    "wpm_net_5": 12.8,
+    "kdph_ssc": 19200.0,
+    "cpm_tqc": 0.0,
+    "cpm_jp": 64.0,
+    "tasu": 320.0,
+    "wpm_4": 16.0,
+    "cpm_raw": 72.0
+   }
+  },
+  {
+   "name": "korean_tasu_counts_jamo",
+   "why": "한 = ㅎ+ㅏ+ㄴ 三打，只能從擊鍵流算",
+   "lang": "ko",
+   "sample": {
+    "prompt": "한한한한한한한한한한한한한한한한한한한한",
+    "typed": "한한한한한한한한한한한한한한한한한한한한",
+    "seconds": 60,
+    "keystrokes": 60,
+    "events": [
+     [
+      0.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      100.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      200.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      300.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      400.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      500.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      600.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      700.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      800.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      900.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      1000.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      1100.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      1200.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      1300.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      1400.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      1500.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      1600.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      1700.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      1800.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      1900.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      2000.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      2100.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      2200.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      2300.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      2400.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      2500.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      2600.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      2700.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      2800.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      2900.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      3000.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      3100.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      3200.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      3300.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      3400.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      3500.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      3600.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      3700.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      3800.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      3900.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      4000.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      4100.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      4200.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      4300.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      4400.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      4500.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      4600.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      4700.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      4800.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      4900.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      5000.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      5100.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      5200.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      5300.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      5400.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      5500.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      5600.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ],
+     [
+      5700.0,
+      "D",
+      "KeyR",
+      "ㅎ"
+     ],
+     [
+      5800.0,
+      "D",
+      "KeyR",
+      "ㅏ"
+     ],
+     [
+      5900.0,
+      "D",
+      "KeyR",
+      "ㄴ"
+     ]
+    ]
+   },
+   "expect": {
+    "kpm": 60.0,
+    "wpm_net_5": 4.0,
+    "kdph_ssc": 3600.0,
+    "cpm_tqc": 20.0,
+    "cpm_jp": 20.0,
+    "tasu": 60.0,
+    "wpm_4": 5.0,
+    "cpm_raw": 20.0
+   }
+  },
+  {
+   "name": "thai_divides_by_four",
+   "why": "泰文一個詞是四個字元，不是英文慣例的五個",
+   "lang": "th",
+   "sample": {
+    "prompt": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก",
+    "typed": "กกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกกก",
+    "seconds": 60,
+    "keystrokes": 140,
+    "events": []
+   },
+   "expect": {
+    "kpm": 140.0,
+    "wpm_net_5": 28.0,
+    "kdph_ssc": 8400.0,
+    "cpm_tqc": 140.0,
+    "cpm_jp": 140.0,
+    "tasu": 140.0,
+    "wpm_4": 35.0,
+    "cpm_raw": 140.0
+   }
+  }
  ]
 }

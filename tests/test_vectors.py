@@ -22,3 +22,14 @@ def test_vector(case):
     assert r.flags == case["expect"]["flags"], case["why"]
     assert r.n_keystrokes == case["expect"]["n_keystrokes"]
     assert r.measures == case["expect"]["measures"]
+
+
+@pytest.mark.parametrize("case", VECTORS["metric_cases"], ids=lambda c: c["name"])
+def test_metric_vector(case):
+    from typingnorm import Session, score
+
+    d = case["sample"]
+    s = Session(case["lang"], "", "", "", d["prompt"], d["typed"], d["seconds"],
+                d["keystrokes"], [tuple(e) for e in d["events"]])
+    for metric, want in case["expect"].items():
+        assert score(s, metric)["value"] == pytest.approx(want, abs=0.05), case["why"]

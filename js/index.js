@@ -173,3 +173,7 @@ export function check(events, options = {}) {
       : 0,
   };
 }
+
+export {
+  METRICS, METRIC_IDS, DEFAULT_METRIC, score, allScores, accuracy, tqcGrade,
+} from "./metrics.js";
