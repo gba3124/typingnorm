@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "humantype practice session",
+  "description": "一次打字練習的原始紀錄。只存量測到的東西，不存任何分數：分數是顯示時才依所選指標從事件流算出來的，這樣換算法或加新指標都不必重收資料。也不存使用者自己寫的文字，因為題目是出好的。",
+  "type": "object",
+  "required": ["schema", "session_id", "started_at", "locale", "prompt_id",
+               "prompt", "typed", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "session_id": {
+      "type": "string",
+      "description": "匿名亂數 ID，不連結到任何身分"
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "consent": {
+      "type": "object",
+      "description": "同意公開釋出的版本與時間。缺這一項的工作階段不得進入公開資料集。",
+      "required": ["version", "granted_at", "redistribution"],
+      "properties": {
+        "version": { "type": "string" },
+        "granted_at": { "type": "string", "format": "date-time" },
+        "redistribution": { "type": "boolean" }
+      }
+    },
+    "locale": {
+      "type": "object",
+      "required": ["language", "script", "input_method", "layout"],
+      "properties": {
+        "language": { "type": "string", "examples": ["zh-TW", "en", "ja", "ko", "hi", "th", "vi", "ar"] },
+        "script": { "type": "string", "examples": ["han-trad", "han-simp", "latin", "kana", "hangul", "devanagari", "thai", "arabic"] },
+        "input_method": { "type": "string", "examples": ["zhuyin", "pinyin", "cangjie", "direct", "inscript", "remington", "telex", "vni", "romaja"] },
+        "layout": { "type": "string", "examples": ["qwerty", "azerty", "dvorak", "dachen", "eten", "dubeolsik", "kedmanee", "pattachote"] }
+      }
+    },
+    "prompt_id": { "type": "string" },
+    "prompt": { "type": "string", "description": "題目原文" },
+    "typed": { "type": "string", "description": "實際打出的內容，用來比對正確率" },
+    "commits": {
+      "type": "array",
+      "description": "組字型輸入法專用：每個字上屏的時刻與用掉的擊鍵數。直打型語言留空。",
+      "items": {
+        "type": "object",
+        "required": ["i", "char", "t", "keys"],
+        "properties": {
+          "i": { "type": "integer" },
+          "char": { "type": "string" },
+          "t": { "type": "number", "description": "毫秒，相對於第一次按鍵" },
+          "keys": { "type": "integer" },
+          "code": { "type": "string", "description": "打出這個字用的輸入碼，例如 ㄐㄧㄣ" }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "原始按鍵事件，依 timeStamp 排序。瀏覽器的派送順序與時間戳不一致，寫入前必須排序。",
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          { "type": "number", "description": "毫秒，相對於第一次按鍵" },
+          { "enum": ["D", "U"], "description": "按下或放開" },
+          { "type": "string", "description": "實體鍵，event.code" },
+          { "type": "string", "description": "event.key，組字時會是注音符號等" }
+        ],
+        "minItems": 4, "maxItems": 4
+      }
+    },
+    "client": {
+      "type": "object",
+      "properties": {
+        "ua": { "type": "string" },
+        "timer_resolution_ms": { "type": "number" }
+      }
+    }
+  }
+}

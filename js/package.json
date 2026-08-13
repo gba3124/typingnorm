@@ -1,0 +1,38 @@
+{
+  "name": "typingnorm",
+  "version": "0.1.0",
+  "description": "Tell whether keystrokes came from a human. Three rules, each with a false-positive rate measured on 2,245 real typists. Zero dependencies.",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gba3124/typingnorm.git",
+    "directory": "js"
+  },
+  "keywords": [
+    "keystroke-dynamics",
+    "bot-detection",
+    "typing",
+    "liveness",
+    "human-verification"
+  ],
+  "license": "MIT",
+  "engines": { "node": ">=18" }
+}

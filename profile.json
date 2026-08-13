@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "source": {
+    "name": "KeyRecs: A keystroke dynamics and typing pattern recognition dataset",
+    "authors": "Dias, Vitorino, Maia, Sousa, Praça",
+    "venue": "Data in Brief, 2023",
+    "doi": "10.1016/j.dib.2023.109509",
+    "url": "https://zenodo.org/records/7886743",
+    "license": "CC BY 4.0",
+    "commercial_use": true
+  },
+  "sample": {
+    "participants": 99,
+    "digraphs": 562372,
+    "wpm_median": 48.5
+  },
+  "speed_definition": "級距以受試者的吞吐量指派：WPM = 12 / mean(IKI)。模型取該級距的 iki_median 當對數常態的中位數（mu = ln(iki_median)），長尾由停頓層補上，因為真實 IKI 分佈比對數常態更尖峰厚尾。",
+  "bands": {
+    "30": {
+      "sigma": 0.7117,
+      "iki_median": 0.246,
+      "dwell_letter": 0.083,
+      "cv": 0.839,
+      "rollover_pct": 2.0,
+      "n": 68400
+    },
+    "40": {
+      "sigma": 0.7052,
+      "iki_median": 0.204,
+      "dwell_letter": 0.09,
+      "cv": 0.877,
+      "rollover_pct": 10.7,
+      "n": 133730
+    },
+    "50": {
+      "sigma": 0.6343,
+      "iki_median": 0.178,
+      "dwell_letter": 0.095,
+      "cv": 0.85,
+      "rollover_pct": 13.1,
+      "n": 130292
+    },
+    "60": {
+      "sigma": 0.612,
+      "iki_median": 0.155,
+      "dwell_letter": 0.096,
+      "cv": 0.816,
+      "rollover_pct": 22.5,
+      "n": 112555
+    },
+    "70": {
+      "sigma": 0.5773,
+      "iki_median": 0.14,
+      "dwell_letter": 0.087,
+      "cv": 0.798,
+      "rollover_pct": 22.2,
+      "n": 49268
+    },
+    "80": {
+      "sigma": 0.6267,
+      "iki_median": 0.122,
+      "dwell_letter": 0.092,
+      "cv": 0.817,
+      "rollover_pct": 31.0,
+      "n": 43255
+    }
+  },
+  "dwell": {
+    "letter_sigma": 0.3429,
+    "space": [
+      0.091,
+      0.3263
+    ],
+    "shift": [
+      0.254,
+      0.4404
+    ],
+    "backspace": [
+      0.079,
+      0.3394
+    ]
+  },
+  "error": {
+    "backspaces_per_char": [
+      0.0676,
+      0.0472,
+      0.0906
+    ],
+    "note": "中位數 / p25 / p75。模型的 error_rate 應校準到重現中位數"
+  },
+  "transition": {
+    "same_hand": 1.1287,
+    "alternate_hand": 0.8904,
+    "same_finger": 1.0723
+  },
+  "lexical": {
+    "rare_word": 1.0474,
+    "common_word": 0.9141,
+    "word_edge": 0.9366,
+    "word_middle": 1.0778
+  },
+  "counts": {
+    "transition": 298920,
+    "lexical": 167252,
+    "position": 167252,
+    "dwell_letter": 413757
+  }
+}

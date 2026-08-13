@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*", "js-v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+      # 模型的輸出分佈必須持續對得上 profile.json 裡的實測值。
+      # 這條會抓到「改了時序邏輯卻沒重新校準」這類改壞。
+      - name: 模型對帳
+        run: python -m typingnorm.simulate --validate
+
+      # 修正邏輯與按鍵序列的合法性：同一個實體鍵不得在放開前又被按下
+      - name: 模擬器自檢
+        run: python -m typingnorm.simulate --selftest
+
+  js:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["18", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # 零依賴，不需要安裝任何東西
+      - run: node --test
+        working-directory: js
+
+  # 兩份實作必須對同一組向量給出相同判定。向量由 Python 端產生，
+  # 這裡確認它是最新的；js 的 vectors.test.js 則確認 JS 跟得上。
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e .
+      - name: 向量與 Python 實作同步
+        run: python tools/gen_vectors.py --check
+
+  build-python:
+    needs: [python, parity]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build
+      - run: python -m build
+      # 資料檔沒被打包進去是很典型的漏，裝起來實際 import 一次才算數
+      - name: 驗證輪檔含常模
+        run: |
+          pip install dist/*.whl
+          cd /tmp && python -c "
+          import typingnorm, json, importlib.resources as r
+          p = json.loads((r.files('typingnorm') / 'profile.json').read_text())
+          assert p['source']['license'] == 'CC BY 4.0'
+          print('常模來源:', p['source']['name'])
+          print('版本', typingnorm.__version__, '判準', list(typingnorm.RULES))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-python
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write     # Trusted Publishing 用 OIDC，不需要在 repo 存 token
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-npm:
+    if: startsWith(github.ref, 'refs/tags/js-v')
+    needs: [js, parity]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write     # npm Trusted Publishing，同樣不需要存 token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm publish --provenance --access public
+        working-directory: js
