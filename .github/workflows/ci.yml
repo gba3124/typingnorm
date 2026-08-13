@@ -113,5 +113,8 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
+      # Node 22 內建的是 npm 10.x，不支援 OIDC trusted publishing（需要 11.5.1 以上），
+      # 沒升的話 npm 會退回 token 認證，用 setup-node 填的佔位字串去發，registry 回 E404。
+      - run: npm install -g npm@latest
       - run: npm publish --provenance --access public
         working-directory: js
