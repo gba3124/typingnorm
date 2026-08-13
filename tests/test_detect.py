@@ -5,12 +5,17 @@
 因為模擬器的輸出分佈是對照過真實資料集的。
 """
 import random
+import sys
+from pathlib import Path
 
 import pytest
 
 from typingnorm import check
 from typingnorm.detect import MIN_KEYSTROKES
 from typingnorm.simulate import Clock, HumanTypist, NullMouse, RecordKeyboard
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from gen_vectors import _code  # noqa: E402
 
 
 TEXT = ("In this project I evaluated the primary model output carefully. "
@@ -23,7 +28,7 @@ def human_events(wpm=60, seed=0):
     clock = Clock(real=False)
     kb = RecordKeyboard(clock)
     HumanTypist(kb, NullMouse(), clock, wpm).type_text(TEXT)
-    return [(t * 1000, kind, str(key), "") for t, kind, key in kb.events]
+    return [(t * 1000, kind, _code(key), "") for t, kind, key in kb.events]
 
 
 def robot_events(n=400, iki=120.0, dwell=80.0):

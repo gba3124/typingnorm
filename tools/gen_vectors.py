@@ -19,6 +19,29 @@ from typingnorm.simulate import Clock, HumanTypist, NullMouse, RecordKeyboard  #
 
 MIN = 20   # 向量用的擊鍵門檻，讓案例保持精簡
 
+# 模擬器內部用的鍵物件（可能是 pynput 的列舉，也可能是未安裝時的字串 fallback）
+# 必須轉成瀏覽器的實體鍵碼，理由有二：偵測 API 的合約要求實體鍵碼；而且直接
+# str() 的結果會隨 pynput 有沒有安裝而變，向量就不再可重現。
+_SPECIAL = {
+    "space": "Space", "shift": "ShiftLeft", "backspace": "Backspace",
+    "enter": "Enter", "ctrl": "ControlLeft", "alt": "AltLeft",
+}
+
+
+def _code(key):
+    name = str(key)
+    for word, code in _SPECIAL.items():
+        if word in name.lower():
+            return code
+    if len(name) == 1:
+        if name.isalpha():
+            return f"Key{name.upper()}"
+        if name.isdigit():
+            return f"Digit{name}"
+        return {" ": "Space", ".": "Period", ",": "Comma"}.get(name, "Unidentified")
+    return "Unidentified"
+
+
 
 def robot(n=40, iki=120.0, dwell=80.0):
     ev = []
@@ -36,7 +59,7 @@ def human(wpm=60, seed=7, keep=60):
     HumanTypist(kb, NullMouse(), clock, wpm).type_text(
         "In this project I evaluated the primary model output carefully."
     )
-    ev = [(round(t * 1000, 1), kind, str(key), "") for t, kind, key in kb.events]
+    ev = [(round(t * 1000, 1), kind, _code(key), "") for t, kind, key in kb.events]
     return ev[:keep]
 
 
