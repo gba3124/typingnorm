@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 node_modules/
 .venv/
+
+# Claude Code 的執行期狀態（hook 產生），不進版控，也不能被打包進 sdist
+.claude/

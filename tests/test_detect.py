@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from typingnorm import check
+from typingnorm import RULES, check
 from typingnorm.detect import MIN_KEYSTROKES
 from typingnorm.simulate import Clock, HumanTypist, NullMouse, RecordKeyboard
 
@@ -77,6 +77,7 @@ def test_zero_rollover_is_flagged_at_speed():
     r = check(robot_events())
     assert "zero_rollover" in r.flags
     assert r.measures["rollover_pct"] == 0.0
+    assert r.as_dict()["false_positive_budget"] == RULES["zero_rollover"].false_positive
 
 
 def test_same_key_overlap_is_flagged():

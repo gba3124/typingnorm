@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""打字速度指標。以下常數與規則的來源見 METHOD.md。
+"""打字速度指標。以下常數與規則的來源見 METHOD.md 第 10 節。
 
 每個語言有慣用的算法，使用者也可以切換成別的。
 
@@ -11,13 +10,16 @@
 單位的來源分兩種，`authoritative` 欄位標示得很清楚：
   True  出自國家級認證機構，數字對當地人有意義（80 字/分是 TQC 專業級）
   False 業界慣例或本站自訂，介面上不得出現「合格」「專業級」這類字眼
+
+JS 端的 metrics.js 是同一套規則，repo 根的 vectors.json 保證兩邊算出一樣的數字。
 """
 import json
 import sys
 from dataclasses import dataclass, field
+from functools import lru_cache
 
-# 注音符號與聲調，用來判斷哪些擊鍵屬於組字過程
-BOPOMOFO = set(range(0x3105, 0x3130)) | {0x02C7, 0x02CA, 0x02CB, 0x02D9}
+from .detect import _is_nav, _round
+
 # 韓文字母，타수 是按字母鍵計數（한 = ㅎ+ㅏ+ㄴ = 3 타）
 HANGUL_JAMO = set(range(0x3131, 0x3164))
 
@@ -31,21 +33,50 @@ class Session:
     layout: str                      # qwerty / dachen / kedmanee / dubeolsik ...
     prompt: str                      # 題目原文
     typed: str                       # 實際打出的內容
-    seconds: float                   # 從第一次按鍵到最後一次按鍵
-    keystrokes: int                  # 按下的總次數，含修正與組字
+    seconds: float                   # 從第一次按下到最後一次按下
+    keystrokes: int                  # 產生文字的按鍵次數，含修正與組字，不含 Shift 與方向鍵等
     events: list = field(default_factory=list)   # [(t, 'D'|'U', code, key)]
 
     def correct_chars(self):
-        """逐位置比對，回傳正確字元數。"""
-        return sum(1 for a, b in zip(self.prompt, self.typed) if a == b)
+        """正確字數：題目與輸入以最少錯誤對齊之後，對得上的字數。"""
+        return _diff(self.prompt, self.typed)[0]
 
     def errors(self):
-        """錯打、多打、漏打合計。顛倒字需要更細的比對，見 TQC 規則。"""
-        wrong = sum(1 for a, b in zip(self.prompt, self.typed) if a != b)
-        return wrong + abs(len(self.prompt) - len(self.typed))
+        """錯打、多打、漏打各算一次錯誤。顛倒字（兩字互換）算兩次，TQC 只算一次。"""
+        return _diff(self.prompt, self.typed)[1]
 
     def minutes(self):
         return max(self.seconds, 1e-9) / 60.0
+
+
+@lru_cache(maxsize=256)
+def _diff(prompt, typed):
+    """(正確字數, 錯誤數)。以最少的錯打、多打、漏打把輸入對齊到題目。
+
+    逐位置比對的話，中間漏打一個字，後面每個字都會算錯。錯誤數相同的對齊有很多種，
+    取正確字最多的那個，JS 端的 diff() 用同一個規則，兩邊的數字才會一樣。
+    """
+    head = 0
+    while head < min(len(prompt), len(typed)) and prompt[head] == typed[head]:
+        head += 1
+    tail = 0
+    while (tail < min(len(prompt), len(typed)) - head
+           and prompt[-1 - tail] == typed[-1 - tail]):
+        tail += 1
+    a, b = prompt[head:len(prompt) - tail], typed[head:len(typed) - tail]
+
+    # 每格是 (錯誤數, -正確字數)，取字典序最小：先求錯誤最少，再求正確最多
+    prev = [(j, 0) for j in range(len(b) + 1)]
+    for i, x in enumerate(a, 1):
+        cur = [(i, 0)]
+        for j, y in enumerate(b, 1):
+            e, m = prev[j - 1]
+            cur.append(min((e, m - 1) if x == y else (e + 1, m),
+                           (prev[j][0] + 1, prev[j][1]),
+                           (cur[j - 1][0] + 1, cur[j - 1][1])))
+        prev = cur
+    e, m = prev[-1]
+    return head + tail - m, e
 
 
 # ---------------------------------------------------------------------------
@@ -81,16 +112,18 @@ def cpm_tqc(s):
 
 
 def cpm_jp(s):
-    """日文：純字数／分。全商速度部門 1 級為 10 分鐘 700 字，即 70 字/分。"""
-    return max(0.0, s.correct_chars() - s.errors()) / s.minutes()
+    """日文：純字数／分。全商速度部門 1 級為 10 分鐘純字数 700 字，即 70 字/分。
+    純字数 = 総字数 − エラー数：誤字、脱字、余分字各扣一字，錯字不會被扣兩次。"""
+    return max(0, len(s.prompt) - s.errors()) / s.minutes()
 
 
 def tasu(s):
     """韓文 타수：按字母鍵計數，不是按字計數。
     「한」是 ㅎ+ㅏ+ㄴ 三打。所以這個指標只能從擊鍵流算，從輸出文字算不出來。
-    워드프로세서 1 급門檻 300 타，一般成人 200 到 300。"""
+    韓國通行的單位，但沒有認證機構訂門檻：워드프로세서 考的是文書編輯，不考打字速度，
+    坊間流傳的「1 급 300 타」並無官方出處。一般成人 200 到 300。"""
     jamo = sum(1 for e in s.events
-               if e[1] == 'D' and e[3] and ord(e[3][0]) in HANGUL_JAMO)
+               if e[1] == 'D' and len(e) > 3 and e[3] and ord(e[3][0]) in HANGUL_JAMO)
     return (jamo or s.keystrokes) / s.minutes()
 
 
@@ -104,15 +137,16 @@ def cpm_raw(s):
     return s.correct_chars() / s.minutes()
 
 
+# 順序與 JS 端的 METRIC_IDS 相同，all_scores() 依此排列
 METRICS = {
-    'kpm':        (kpm,        '打鍵/分',  False, '跨語言比較用的共同分母'),
-    'wpm_net_5':  (wpm_net_5,  'WPM',      False, '英文慣例，五字元一詞'),
-    'kdph_ssc':   (kdph_ssc,   'KDPH',     True,  'SSC 公職考試，10500 = 35 WPM'),
-    'cpm_tqc':    (cpm_tqc,    '字/分',    True,  'TQC，專業級 80'),
+    'cpm_tqc':    (cpm_tqc,    '字/分',    True,  'TQC 中文輸入，專業級 80'),
     'cpm_jp':     (cpm_jp,     '字/分',    True,  '全商速度部門，1 級 70'),
-    'tasu':       (tasu,       '타수',     True,  '워드프로세서 1급 300'),
+    'tasu':       (tasu,       '타수',     False, '韓文慣用單位，按字母鍵計數'),
+    'kdph_ssc':   (kdph_ssc,   'KDPH',     True,  'SSC 公職考試，10500 = 35 WPM'),
+    'wpm_net_5':  (wpm_net_5,  'WPM',      False, '英文慣例，五字元一詞'),
     'wpm_4':      (wpm_4,      'คำ/นาที',  False, '泰文社群慣例，四字元一詞'),
-    'cpm_raw':    (cpm_raw,    '字元/分',  False, '中性預設'),
+    'kpm':        (kpm,        '打鍵/分',  False, '跨語言比較用的共同分母'),
+    'cpm_raw':    (cpm_raw,    '字元/分',  False, '沒有當地標準時的中性預設'),
 }
 
 # 語言的預設指標。使用者可以切換成 METRICS 裡的任何一個。
@@ -128,7 +162,7 @@ def score(session, metric=None):
     key = metric or DEFAULT_METRIC.get(session.language, 'cpm_raw')
     fn, unit, authoritative, note = METRICS[key]
     return {
-        'metric': key, 'value': round(fn(session), 1), 'unit': unit,
+        'metric': key, 'value': _round(fn(session), 1), 'unit': unit,
         'authoritative': authoritative, 'note': note,
     }
 
@@ -136,6 +170,22 @@ def score(session, metric=None):
 def all_scores(session):
     """全部算一遍，給切換用。介面只是換一個已經算好的值，不用重打。"""
     return [score(session, k) for k in METRICS]
+
+
+def accuracy(session):
+    """正確率：1 − 錯誤數 / 題目字數，最低為 0。"""
+    return max(0.0, 1 - session.errors() / max(len(session.prompt), 1))
+
+
+def tqc_grade(cpm):
+    """TQC 的級別。只有 authoritative 的指標才給得出級別。"""
+    if cpm >= 80:
+        return '專業級'
+    if cpm >= 30:
+        return '進階級'
+    if cpm >= 15:
+        return '實用級'
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +220,11 @@ def _demo():
                      seconds=60, keystrokes=320)
     assert score(tw_bad)['value'] == 0.0
 
+    # 全商：10 分鐘純字数 700 字是 1 級，即 70 字/分；錯三字只扣三字
+    jp = Session('ja', 'kana', 'romaji', 'qwerty',
+                 prompt='あ' * 700, typed='あ' * 697 + 'い' * 3, seconds=600, keystrokes=1400)
+    assert abs(score(jp)['value'] - 69.7) < 0.01
+
     # 韓文：타수 從擊鍵流算。「한」三個字母鍵，打二十次即 60 타/分
     ev = [(i * 100.0, 'D', 'KeyR', c) for i, c in enumerate('ㅎㅏㄴ' * 20)]
     ko = Session('ko', 'hangul', 'direct', 'dubeolsik',
@@ -180,7 +235,7 @@ def _demo():
     # 同一場練習換指標，值要跟著換，原始資料完全沒動
     assert len({s['metric'] for s in all_scores(tw)}) == len(METRICS)
 
-    print('metrics 自檢通過：SSC / TQC / 全商 / 워드프로세서 的門檻換算都對得上')
+    print('metrics 自檢通過：SSC / TQC / 全商的門檻換算都對得上')
     print()
     print('同一場練習（TQC 專業級 80 字/分）換成各種指標：')
     for s in all_scores(tw):
@@ -188,24 +243,31 @@ def _demo():
         print(f"  {s['metric']:11s} {s['value']:9.1f} {s['unit']:9s} [{flag}] {s['note']}")
 
 
+def parse_session(d):
+    """把網站產出的 session（格式見 session_schema.json）轉成 Session。
 
-
-def load_session(path):
-    """從 session JSON 載入。欄位缺漏在這裡就會炸，不會拖到分析階段才發現。"""
-    with open(path, encoding='utf-8') as f:
-        d = json.load(f)
+    秒數與擊鍵數一律從事件流現算，規則與 JS 端的 toSample() 相同：秒數是第一次到
+    最後一次按下，擊鍵數只算產生文字的鍵。欄位缺漏在這裡就會炸，不會拖到分析階段
+    才發現。
+    """
     for k in ('schema', 'session_id', 'locale', 'prompt', 'typed', 'events'):
         if k not in d:
-            raise ValueError(f'{path} 缺少必填欄位 {k}')
-    ev = sorted(d['events'], key=lambda e: e[0])   # 派送順序不可信，一律重排
+            raise ValueError(f'session 缺少必填欄位 {k}')
+    ev = sorted((tuple(e) for e in d['events']), key=lambda e: e[0])  # 派送順序不可信
     downs = [e for e in ev if e[1] == 'D']
     return Session(
         language=d['locale']['language'], script=d['locale']['script'],
         input_method=d['locale']['input_method'], layout=d['locale']['layout'],
         prompt=d['prompt'], typed=d['typed'],
-        seconds=(ev[-1][0] - ev[0][0]) / 1000.0 if ev else 0.0,
-        keystrokes=len(downs), events=[(e[0], e[1], e[2], e[3]) for e in ev],
+        seconds=(downs[-1][0] - downs[0][0]) / 1000.0 if len(downs) > 1 else 0.0,
+        keystrokes=sum(1 for e in downs if not _is_nav(e[2])), events=ev,
     )
+
+
+def load_session(path):
+    """從 session JSON 檔載入，見 parse_session()。"""
+    with open(path, encoding='utf-8') as f:
+        return parse_session(json.load(f))
 
 
 if __name__ == '__main__':

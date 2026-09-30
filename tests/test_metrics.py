@@ -3,9 +3,14 @@
 每個語言的指標都對照該國認證機構公開的門檻驗算。公式改壞了，這裡就會失敗，
 而不是等到有人拿去考試才發現數字不對。門檻的出處見 METHOD.md。
 """
+import json
+from pathlib import Path
+
 import pytest
 
-from typingnorm import METRICS, Session, all_scores, score
+from typingnorm import METRICS, Session, all_scores, parse_session, score
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def sess(lang, script, im, layout, prompt, typed=None, seconds=60, keys=None, events=()):
@@ -74,19 +79,44 @@ def test_switching_metric_does_not_touch_raw_data():
 
 
 def test_non_authoritative_metrics_are_marked():
-    """沒有官方標準的語言不得宣稱合格，介面靠這個旗標把關。"""
+    """沒有官方標準的語言不得宣稱合格，介面靠這個旗標把關。
+
+    韓文的 타수 是通行單位，但워드프로세서 考的是文書編輯，沒有打字速度門檻。
+    """
     assert METRICS["wpm_4"][2] is False
     assert METRICS["kpm"][2] is False
+    assert METRICS["tasu"][2] is False
     assert METRICS["cpm_tqc"][2] is True
+
+
+def test_omission_does_not_shift_the_rest():
+    """中間漏打一個字只是一次錯誤。逐位置比對會讓後面每個字都錯，TQC 直接歸零。"""
+    s = sess("zh-TW", "han-trad", "zhuyin", "dachen", "今天天氣很好我想出去走走" * 5,
+             typed="今天氣很好我想出去走走" + "今天天氣很好我想出去走走" * 4, keys=240)
+    assert (s.correct_chars(), s.errors()) == (59, 1)
+    assert score(s)["value"] == pytest.approx(58.5, abs=0.01)
 
 
 def test_example_session_round_trips():
     """網站產出的 session 檔要能直接被分析端吃進去。"""
-    from pathlib import Path
-
     from typingnorm import load_session
 
-    p = Path(__file__).resolve().parents[1] / "examples" / "zh-TW-zhuyin.json"
-    s = load_session(str(p))
+    s = load_session(str(ROOT / "examples" / "zh-TW-zhuyin.json"))
     assert s.language == "zh-TW"
     assert s.keystrokes / len(s.prompt) == pytest.approx(4.0, abs=0.1)
+
+
+def test_session_missing_field_fails_early():
+    with pytest.raises(ValueError, match="events"):
+        parse_session({"schema": 1, "session_id": "x", "locale": {}, "prompt": "", "typed": ""})
+
+
+def test_example_session_matches_schema():
+    """網站產出的格式就是 session_schema.json。範例不合格，代表兩者之一過時了。"""
+    jsonschema = pytest.importorskip("jsonschema")
+    schema = json.loads((ROOT / "session_schema.json").read_text(encoding="utf-8"))
+    example = json.loads((ROOT / "examples" / "zh-TW-zhuyin.json").read_text(encoding="utf-8"))
+    validator = jsonschema.Draft202012Validator(schema)
+    validator.validate(example)
+    with pytest.raises(jsonschema.ValidationError):   # 分數永遠不落地
+        validator.validate({**example, "score": 80.0})

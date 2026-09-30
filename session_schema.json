@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "humantype practice session",
-  "description": "一次打字練習的原始紀錄。只存量測到的東西，不存任何分數：分數是顯示時才依所選指標從事件流算出來的，這樣換算法或加新指標都不必重收資料。也不存使用者自己寫的文字，因為題目是出好的。",
+  "title": "typingnorm practice session",
+  "description": "一次打字練習的原始紀錄。只存量測到的東西，不存任何分數：分數是顯示時才依所選指標從事件流算出來的，這樣換算法或加新指標都不必重收資料。也不存使用者自己寫的文字，因為題目是出好的。Python 的 parse_session() 與 JS 的 toSample() 讀的就是這個格式。",
   "type": "object",
   "required": ["schema", "session_id", "started_at", "locale", "prompt_id",
                "prompt", "typed", "events"],
@@ -15,25 +15,40 @@
     "started_at": { "type": "string", "format": "date-time" },
     "consent": {
       "type": "object",
-      "description": "同意公開釋出的版本與時間。缺這一項的工作階段不得進入公開資料集。",
+      "description": "貢獻同意的版本與時間。缺這一項、或版本不在接受清單裡的工作階段，不得用於擬合常模。redistribution 為 false 時只能用於自家常模，不得再散布給第三方。",
       "required": ["version", "granted_at", "redistribution"],
       "properties": {
-        "version": { "type": "string" },
+        "version": { "type": "string", "examples": ["contrib-v1", "contrib-v2", "local-only"] },
+        "purpose": { "type": "string", "examples": ["norm-fitting+leaderboard"] },
         "granted_at": { "type": "string", "format": "date-time" },
         "redistribution": { "type": "boolean" }
       }
+    },
+    "nickname": {
+      "type": ["string", "null"],
+      "maxLength": 16,
+      "description": "排行榜暱稱。使用者自填、會公開顯示，只在同意貢獻時存在"
     },
     "locale": {
       "type": "object",
       "required": ["language", "script", "input_method", "layout"],
       "properties": {
         "language": { "type": "string", "examples": ["zh-TW", "en", "ja", "ko", "hi", "th", "vi", "ar"] },
-        "script": { "type": "string", "examples": ["han-trad", "han-simp", "latin", "kana", "hangul", "devanagari", "thai", "arabic"] },
-        "input_method": { "type": "string", "examples": ["zhuyin", "pinyin", "cangjie", "direct", "inscript", "remington", "telex", "vni", "romaja"] },
-        "layout": { "type": "string", "examples": ["qwerty", "azerty", "dvorak", "dachen", "eten", "dubeolsik", "kedmanee", "pattachote"] }
+        "script": { "type": "string", "examples": ["han-trad", "han-simp", "han", "latin", "kana", "hangul", "devanagari", "thai", "arabic"] },
+        "input_method": {
+          "type": "string",
+          "description": "瀏覽器無法得知實際用的輸入法時，組字型填 composed、直打型填 direct",
+          "examples": ["zhuyin", "pinyin", "cangjie", "direct", "composed", "inscript", "remington", "telex", "vni", "romaja"]
+        },
+        "layout": { "type": "string", "examples": ["qwerty", "azerty", "dvorak", "dachen", "eten", "dubeolsik", "kedmanee", "pattachote", "unknown"] }
       }
     },
     "prompt_id": { "type": "string" },
+    "bucket": {
+      "type": "string",
+      "description": "題目的長度分組，排行榜依語言與分組各自排名",
+      "examples": ["short", "medium", "long", "para"]
+    },
     "prompt": { "type": "string", "description": "題目原文" },
     "typed": { "type": "string", "description": "實際打出的內容，用來比對正確率" },
     "commits": {
@@ -47,13 +62,14 @@
           "char": { "type": "string" },
           "t": { "type": "number", "description": "毫秒，相對於第一次按鍵" },
           "keys": { "type": "integer" },
-          "code": { "type": "string", "description": "打出這個字用的輸入碼，例如 ㄐㄧㄣ" }
+          "code": { "type": "string", "description": "打出這個字用的輸入碼，例如 ㄐㄧㄣ" },
+          "revised": { "type": "boolean", "description": "輸入法依詞組回頭改寫過這個字" }
         }
       }
     },
     "events": {
       "type": "array",
-      "description": "原始按鍵事件，依 timeStamp 排序。瀏覽器的派送順序與時間戳不一致，寫入前必須排序。",
+      "description": "原始按鍵事件，依 timeStamp 排序。瀏覽器的派送順序與時間戳不一致，寫入前必須排序。按住不放的自動重複（event.repeat）不記錄。",
       "items": {
         "type": "array",
         "prefixItems": [
@@ -65,11 +81,25 @@
         "minItems": 4, "maxItems": 4
       }
     },
+    "keymap": {
+      "type": "object",
+      "description": "觀測到的 event.code → event.key 對照，用來反推注音等鍵位。部分輸入法與瀏覽器的組合下 key 會是英文字母而不是注音符號",
+      "additionalProperties": { "type": "string" }
+    },
+    "keystrokes": {
+      "type": "object",
+      "description": "前端統計的擊鍵數，只是方便查詢的衍生值。分析與計分一律從 events 重算",
+      "properties": {
+        "text": { "type": "integer" },
+        "nav": { "type": "integer" }
+      }
+    },
     "client": {
       "type": "object",
       "properties": {
         "ua": { "type": "string" },
-        "timer_resolution_ms": { "type": "number" }
+        "timer_resolution_ms": { "type": "number" },
+        "key_reports_symbol": { "type": "boolean", "description": "event.key 是否真的回傳注音符號" }
       }
     }
   }
