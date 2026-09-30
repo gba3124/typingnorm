@@ -6,30 +6,77 @@
 
 Aalto 授權：研究與非商業用途，需標註作者。
 Dhakal, Feit, Kristensson, Oulasvirta. CHI 2018.
+
+    curl -LO https://userinterfaces.aalto.fi/136Mkeystrokes/data/Keystrokes.zip  # 1.6 GB
+    python3 validate/aalto_holdout.py Keystrokes.zip 2500
+
+輸出分兩部分。前半是逐人的結構統計，即 METHOD 7.1 與 7.2 的表；後半直接拿
+typingnorm.check() 判定同一批人，即 METHOD 7.3 的表，RULES 裡的誤判率出自這裡。
 """
-import math
 import random
 import statistics
 import sys
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
+from pathlib import Path
 
-from fit import FINGER_MAP, load_sections, norm_letter
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from typingnorm import RULES, check  # noqa: E402
+from typingnorm.simulate import FINGER_MAP  # noqa: E402
 
-ZIP = 'Keystrokes.zip'
 IKI_LO, IKI_HI = 0.02, 2.0
 DWELL_LO, DWELL_HI = 0.02, 0.6
 
+# LETTER 欄的鍵名。結構統計只看字元、Shift 與退格，其餘鍵名（CAPS_LOCK、方向鍵…）略過
+NAMES = {"SHIFT": "Shift", "BKSP": "Backspace"}
 
-def person_stats(sections):
-    """把一個受試者的所有句子彙總成他個人的統計量（單位：秒）。"""
+# KEYCODE 欄是 JS 的 keyCode，換成 check() 合約要求的實體鍵碼。左右 Shift 都是 16，
+# 資料本身分不出來；59、61、173 是 Firefox 的分號、等號、減號。
+CODES = {8: "Backspace", 9: "Tab", 13: "Enter", 16: "ShiftLeft", 17: "ControlLeft",
+         18: "AltLeft", 20: "CapsLock", 27: "Escape", 32: "Space", 33: "PageUp",
+         34: "PageDown", 35: "End", 36: "Home", 37: "ArrowLeft", 38: "ArrowUp",
+         39: "ArrowRight", 40: "ArrowDown", 45: "Insert", 46: "Delete", 59: "Semicolon",
+         61: "Equal", 91: "MetaLeft", 92: "MetaRight", 93: "ContextMenu", 144: "NumLock",
+         173: "Minus", 186: "Semicolon", 187: "Equal", 188: "Comma", 189: "Minus",
+         190: "Period", 191: "Slash", 192: "Backquote", 219: "BracketLeft",
+         220: "Backslash", 221: "BracketRight", 222: "Quote", 229: "Process",
+         **{k: f"Digit{k - 48}" for k in range(48, 58)},
+         **{k: f"Key{chr(k)}" for k in range(65, 91)},
+         **{k: f"Numpad{k - 96}" for k in range(96, 106)}}
+
+
+def load(z, name):
+    """一位受試者的全部擊鍵：[(句子 ID, LETTER, keyCode, 按下 ms, 放開 ms)]，依檔案順序。"""
+    raw = z.read(name)
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    rows = []
+    for line in text.split("\n")[1:]:
+        f = line.rstrip("\r").split("\t")
+        if len(f) != 9:
+            continue
+        try:
+            rows.append((f[1], f[7], int(f[8]) if f[8].isdigit() else -1,
+                         int(f[5]), int(f[6])))
+        except ValueError:
+            continue
+    return rows
+
+
+def person_stats(rows):
+    """把一位受試者的所有句子彙總成他個人的統計量（單位：秒）。"""
+    sections = defaultdict(list)
+    for sec, letter, _, p, r in rows:
+        k = letter if len(letter) == 1 else NAMES.get(letter)
+        if k:
+            sections[sec].append((k, p / 1000.0, r / 1000.0))
+
     iki, ud, dwell = [], [], []
     alt, same = [], []
     same_key_overlap = 0
-
-    for _, ks in sections:
-        seq = [(norm_letter(l), p / 1000.0, r / 1000.0) for l, p, r in ks]
-        seq = [x for x in seq if x[0]]
+    for seq in sections.values():
         for i, (k1, p1, r1) in enumerate(seq):
             if DWELL_LO <= r1 - p1 <= DWELL_HI and len(k1) == 1:
                 dwell.append(r1 - p1)
@@ -60,22 +107,30 @@ def person_stats(sections):
     }
 
 
-def main(n_people=2500):
-    with zipfile.ZipFile(ZIP) as z:
+def events(rows):
+    """轉成 check() 吃的事件流。15 句接成一段，句間的停頓照實保留。"""
+    ev = []
+    for _, letter, kc, p, r in rows:
+        code = CODES.get(kc, f"Unidentified{kc}")
+        ev += [(p, "D", code, letter), (r, "U", code, letter)]
+    return ev
+
+
+def main(path='Keystrokes.zip', n_people=2500):
+    people, reports = [], []
+    with zipfile.ZipFile(path) as z:
         files = [n for n in z.namelist() if n.endswith('_keystrokes.txt')]
         random.seed(1)
-        sample = random.sample(files, min(n_people, len(files)))
-        people = []
-        for name in sample:
-            try:
-                s = person_stats(load_sections(z, name))
-            except Exception:
-                continue
+        for name in random.sample(files, min(n_people, len(files))):
+            rows = load(z, name)
+            s = person_stats(rows)
             if s:
                 people.append(s)
+            reports.append(check(events(rows)))
 
     n = len(people)
-    print(f"獨立驗證集：Aalto 136M Keystrokes，取樣 {n} 位受試者\n")
+    print(f"獨立驗證集：Aalto 136M Keystrokes，取樣 {len(reports)} 位受試者，"
+          f"其中 {n} 位有足夠的結構統計量\n")
 
     print("== 第一層判準在真人身上的誤判率 ==")
     zero_roll = [p for p in people if p['rollover'] == 0]
@@ -83,7 +138,7 @@ def main(n_people=2500):
     flat_dwell = [p for p in people if p['dwell_cv'] < 0.05]
     print(f"  rollover 剛好等於 0        {len(zero_roll):5d} / {n}  "
           f"({len(zero_roll)/n*100:.2f}%)")
-    print(f"  同一實體鍵重疊             {len(overlap):5d} / {n}  "
+    print(f"  同一鍵名重疊（含 Shift）   {len(overlap):5d} / {n}  "
           f"({len(overlap)/n*100:.2f}%)")
     print(f"  dwell 變異係數 < 0.05      {len(flat_dwell):5d} / {n}  "
           f"({len(flat_dwell)/n*100:.2f}%)")
@@ -127,6 +182,21 @@ def main(n_people=2500):
               f"         {statistics.median([x['alt_ratio'] for x in g]):.3f}"
               f"        {statistics.median([x['dwell_med'] for x in g])*1000:5.0f}ms")
 
+    judged = [r for r in reports if r.verdict != "insufficient-data"]
+    m = len(judged)
+    print(f"\n== typingnorm.check() 本身的判定（{m} 人，另 {len(reports) - m} 人樣本不足）==")
+    flagged = Counter(f for r in judged for f in r.flags)
+    for rule in RULES.values():
+        k = flagged[rule.id]
+        print(f"  {rule.id:18s} {k:4d} / {m}  ({k/m*100:.2f}%)"
+              f"   RULES 記載 {rule.false_positive*100:.2f}%")
+    bad = sum(1 for r in judged if r.verdict == "synthetic-signals")
+    print(f"  任一判準觸發       {bad:4d} / {m}  ({bad/m*100:.2f}%)")
+    slow = sorted(r.measures['wpm'] for r in judged if "zero_rollover" in r.flags)
+    if slow:
+        print(f"    zero_rollover 觸發者的速度：{slow[0]:.1f} 到 {slow[-1]:.1f} WPM")
+
 
 if __name__ == '__main__':
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 2500)
+    args = sys.argv[1:]
+    main(args[0] if args else 'Keystrokes.zip', int(args[1]) if len(args) > 1 else 2500)

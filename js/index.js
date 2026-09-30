@@ -14,7 +14,8 @@
  *
  * 回報訊號，不回報布林值。刻意模仿真人時序的程式可以通過全部判準。
  *
- * 每條判準的誤判率都在 Aalto 136M Keystrokes 的 2,245 位受試者上量過，見 METHOD.md。
+ * 每條判準的誤判率都拿 check() 在 Aalto 136M Keystrokes 的 2,500 位受試者上量過，
+ * 見 METHOD.md 第 7.3 節。
  */
 
 /** 選字、確認、切換輸入法的鍵不是產生文字的擊鍵。 */
@@ -29,12 +30,20 @@ const MODIFIERS = ["Shift", "Control", "Alt", "Meta", "OS", "CapsLock", "Fn"];
 export const MIN_KEYSTROKES = 150;
 export const ROLLOVER_MIN_WPM = 35.0;
 export const MIN_HUMAN_DWELL_MS = 5.0;
+/**
+ * 同鍵重疊只看「緊接著」的重按，且間隔要落在擬合時的擊鍵間隔窗口（METHOD 3.2）。
+ * 短於 20ms 是按鍵彈跳或記錄重複；長於 2 秒是 keyup 遺失，不是手指還按著。
+ * 不限定的話，一次遺失的 keyup 會讓之後任何一次按同一鍵都被當成重疊（METHOD 7.3）。
+ */
+export const SAME_KEY_GAP_MS = [20.0, 2000.0];
 
 export const RULES = {
   same_key_overlap: {
     id: "same_key_overlap",
-    what: "同一個實體鍵在放開前又被按下。手指做不到，作業系統的行為也未定義。",
-    falsePositive: 0.0,
+    what:
+      "同一個實體鍵在放開前又緊接著被按下（間隔 20ms 到 2 秒）。手指做不到，" +
+      "作業系統的行為也未定義。",
+    falsePositive: 0.0004,
   },
   constant_dwell: {
     id: "constant_dwell",
@@ -46,7 +55,7 @@ export const RULES = {
   zero_rollover: {
     id: "zero_rollover",
     what: "完全沒有按鍵重疊。只在 35 WPM 以上套用，因為慢速真人本來就接近零。",
-    falsePositive: 0.0031,
+    falsePositive: 0.0016,
   },
 };
 
@@ -64,7 +73,7 @@ function cv(xs) {
   if (xs.length < 2) return null;
   const m = xs.reduce((a, b) => a + b, 0) / xs.length;
   if (m <= 0) return null;
-  const v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length;
+  const v = xs.reduce((a, b) => a + (b - m) * (b - m), 0) / xs.length;
   return Math.sqrt(v) / m;
 }
 
@@ -84,14 +93,20 @@ function pair(events) {
   const down = new Map();
   const presses = [];
   let overlaps = 0;
+  let last = null; // 上一個非修飾鍵的 keydown
 
   for (const [t, kind, code] of ordered) {
     if (kind !== "D" && kind !== "U") {
       throw new TypeError(`事件類型必須是 'D' 或 'U'，收到 ${JSON.stringify(kind)}`);
     }
     if (kind === "D") {
-      if (down.has(code) && !isModifier(code)) overlaps += 1;
+      // 修飾鍵排除在外：左右 Shift 常被正規化成同一個名字，那會製造假的重疊
+      if (down.has(code) && code === last) {
+        const gap = t - down.get(code);
+        if (gap >= SAME_KEY_GAP_MS[0] && gap <= SAME_KEY_GAP_MS[1]) overlaps += 1;
+      }
       down.set(code, t);
+      if (!isModifier(code)) last = code;
     } else {
       const start = down.get(code);
       if (start !== undefined) {
@@ -111,6 +126,7 @@ function pair(events) {
  * @param {Array<[number, "D"|"U", string, string?]>} events
  *   (毫秒, 按下或放開, 實體鍵碼, 可省略的 key)。**鍵碼必須是實體鍵**
  *   （瀏覽器的 event.code），不是字元，否則同鍵重疊那條判準會失準。
+ *   按住不放產生的自動重複（event.repeat 為真的 keydown）不是擊鍵，收集時就要丟掉。
  * @param {{ minKeystrokes?: number }} [options]
  * @returns {Report}
  */
@@ -152,7 +168,7 @@ export function check(events, options = {}) {
     "觸發的判準只證明這串輸入不像手打的。沒有觸發也不證明是人，" +
     "刻意模仿真人時序的程式可以通過全部判準。";
   if (flags.length === 0 && wpm < ROLLOVER_MIN_WPM) {
-    note += ` 另外此次速度 ${wpm.toFixed(0)} WPM 低於 ${ROLLOVER_MIN_WPM.toFixed(0)}，零重疊判準未套用。`;
+    note += ` 另外此次速度 ${round(wpm, 0)} WPM 低於 ${ROLLOVER_MIN_WPM}，零重疊判準未套用。`;
   }
 
   return {
@@ -171,6 +187,27 @@ export function check(events, options = {}) {
     falsePositiveBudget: flags.length
       ? Math.max(...flags.map((f) => RULES[f].falsePositive))
       : 0,
+  };
+}
+
+/**
+ * 把一筆 session（格式見 session_schema.json）轉成 score() 吃的樣本。
+ *
+ * 秒數與擊鍵數一律從事件流現算，規則與 Python 端的 parse_session() 相同：秒數是
+ * 第一次到最後一次按下，擊鍵數只算產生文字的鍵。前端顯示與伺服器重算都該走這裡，
+ * 各自再寫一份的話，同一場練習就會有兩個分數。
+ *
+ * @param {{prompt: string, typed: string, events: Array}} session
+ */
+export function toSample(session) {
+  const events = [...session.events].sort((a, b) => a[0] - b[0]);
+  const downs = events.filter((e) => e[1] === "D");
+  return {
+    prompt: session.prompt,
+    typed: session.typed,
+    seconds: downs.length > 1 ? (downs[downs.length - 1][0] - downs[0][0]) / 1000 : 0,
+    keystrokes: downs.filter((e) => !isNav(e[2])).length,
+    events,
   };
 }
 

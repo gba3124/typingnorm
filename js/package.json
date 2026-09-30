@@ -1,6 +1,6 @@
 {
   "name": "typingnorm",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Tell whether keystrokes came from a human, and score typing speed with each locale's own standard. Zero dependencies.",
   "type": "module",
   "main": "index.js",

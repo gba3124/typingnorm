@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """真人打字模擬器。時序參數擬合自公開的擊鍵動態資料集，見 profile.json 與 METHOD.md。
 
-真跑：  python3 human_typist.py --file 文章.txt --wpm 65 --delay 5
-乾跑：  python3 human_typist.py --dry-run          # 不碰鍵盤，只印時間統計與對帳
-自檢：  python3 human_typist.py --selftest         # 驗證修正邏輯與按鍵序列合法性
+真跑：  python -m typingnorm.simulate --file 文章.txt --wpm 65 --delay 5
+乾跑：  python -m typingnorm.simulate --dry-run      # 不碰鍵盤，只印時間統計與對帳
+對帳：  python -m typingnorm.simulate --validate     # 輸出分佈與 profile.json 的實測值對帳
+自檢：  python -m typingnorm.simulate --selftest     # 驗證修正邏輯與按鍵序列合法性
+
+真跑需要 pynput：pip install "typingnorm[desktop]"。
 
 執行中按 Esc 中止。macOS 需在「系統設定 → 隱私權與安全性 → 輔助使用」
 把終端機（或 iTerm）打勾，否則按鍵送不出去。
@@ -105,7 +108,7 @@ UNSHIFT_MAP = {v: k for k, v in SHIFT_MAP.items()}
 # ---------------------------------------------------------------------------
 
 def _load_profile():
-    """已安裝時讀套件內的副本，開發時讀 repo 根的 data/。單一事實來源在後者。"""
+    """已安裝時讀套件內的副本，開發時讀 repo 根的 profile.json。單一事實來源在後者。"""
     here = os.path.dirname(os.path.abspath(__file__))
     for path in (os.path.join(here, "profile.json"),
                  os.path.join(here, "..", "..", "profile.json")):
@@ -253,7 +256,8 @@ class HumanTypist:
         self.clock = clock
         self.mu, self.sigma, self.dwell_med = profile_for(target_wpm)[:3]
         # 認知停頓也跟著整體流暢度縮放：打字快的人讀稿的語塊更大、頓得更少。
-        # 這條沒有實測依據（資料集是抄短句，量不到寫作停頓），是保守的平方根縮放。
+        # 這條沒有實測依據（資料集沒有語意標註，分不出寫作停頓與擊鍵節奏），
+        # 是保守的平方根縮放。
         self.pause_scale = math.sqrt(math.exp(self.mu) / 0.160)
         self.error_rate = error_rate
         self.dual_capital_rate = dual_capital_rate
@@ -479,7 +483,7 @@ class HumanTypist:
                 self.last_char = None
                 continue
 
-            # 疲勞因子：資料集只有短句轉錄，量不到長時間疲勞，這條維持保守估計
+            # 疲勞因子：資料集的作業時間太短，量不到長時間疲勞，這條維持保守估計
             fatigue = 1.0 + (self.total_typed_chars / 3000.0) * 0.12
 
             trigger_dual_cap = (
@@ -507,7 +511,7 @@ class HumanTypist:
 
             self._type_char(' ')
             self.last_char = ' '
-            # 標點後的重構停頓。資料集是抄短句，量不到這層，維持人工估計。
+            # 標點後的重構停頓。資料集沒有語意標註，量不到這層，維持人工估計。
             if word[-1] in '.!?':
                 self._mouse_micro_jitter(self._pause(1.8, 3.8))
             elif word[-1] == ',':
@@ -655,7 +659,7 @@ def selftest():
 
 
 def main():
-    p = argparse.ArgumentParser(description="真人打字模擬器（時序擬合自 Aalto 136M Keystrokes）")
+    p = argparse.ArgumentParser(description="真人打字模擬器（時序擬合自 KeyRecs，CC BY 4.0）")
     p.add_argument("--file", help="要打的文字檔（不給就用內建範例；用 - 讀 stdin）")
     p.add_argument("--wpm", type=float, default=65,
                    help="目標手指速度 20~100，預設 65（含思考停頓的實際 WPM 會更低）")

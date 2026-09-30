@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ["18", "22"]
+        node: ["18", "22", "24"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,13 +72,15 @@ jobs:
       - run: pip install build
       - run: python -m build
       # 資料檔沒被打包進去是很典型的漏，裝起來實際 import 一次才算數
-      - name: 驗證輪檔含常模
+      - name: 驗證輪檔含常模與 session 格式
         run: |
           pip install dist/*.whl
           cd /tmp && python -c "
           import typingnorm, json, importlib.resources as r
           p = json.loads((r.files('typingnorm') / 'profile.json').read_text())
           assert p['source']['license'] == 'CC BY 4.0'
+          s = json.loads((r.files('typingnorm') / 'session_schema.json').read_text())
+          assert s['properties']['schema']['const'] == 1
           print('常模來源:', p['source']['name'])
           print('版本', typingnorm.__version__, '判準', list(typingnorm.RULES))"
       - uses: actions/upload-artifact@v4

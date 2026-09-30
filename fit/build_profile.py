@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """從 KeyRecs (CC BY 4.0) 擬合出 profile.json。
 
+    curl -L -o free-text.csv "https://zenodo.org/records/7886743/files/free-text.csv?download=1"
+    python3 fit/build_profile.py free-text.csv     # 在 repo 根執行，覆寫 profile.json
+
 速度的定義：WPM = 12 / mean(IKI)。因為打 N 個字元耗時 N*mean(IKI) 秒，
 字數 = N/5，所以 WPM = 60/(5*mean_IKI) = 12/mean_IKI。用平均數而不是中位數，
 模型才能在給定 WPM 時算出正確的 mu，讓 --wpm 這個旋鈕是準的。
@@ -9,9 +12,10 @@ import csv
 import json
 import math
 import statistics
+import sys
 from collections import defaultdict
 
-SRC = 'keyrecs-free.csv'
+SRC = sys.argv[1] if len(sys.argv) > 1 else 'free-text.csv'   # Zenodo 上的原始檔名
 OUT = 'profile.json'
 
 FINGER_MAP = {

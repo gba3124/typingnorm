@@ -14,21 +14,62 @@ const HANGUL_JAMO = /[ㄱ-ㅣ]/;
 
 const chars = (s) => [...s];
 
-const correct = (sample) => {
-  const a = chars(sample.prompt);
-  const b = chars(sample.typed);
-  return a.reduce((n, ch, i) => n + (ch === b[i] ? 1 : 0), 0);
-};
+let last = { prompt: null, typed: null, result: null };
 
-const errors = (sample) => {
-  const a = chars(sample.prompt);
-  const b = chars(sample.typed);
-  const wrong = a.reduce(
-    (n, ch, i) => n + (b[i] !== undefined && ch !== b[i] ? 1 : 0),
-    0,
-  );
-  return wrong + Math.abs(a.length - b.length);
-};
+/**
+ * [正確字數, 錯誤數]。以最少的錯打、多打、漏打把輸入對齊到題目。
+ *
+ * 逐位置比對的話，中間漏打一個字，後面每個字都會算錯。錯誤數相同的對齊有很多種，
+ * 取正確字最多的那個，與 Python 端的 _diff() 同一個規則，兩邊的數字才會一樣。
+ * 一次算分會對同一組字串問好幾次，所以記住上一次的結果。
+ */
+function diff(prompt, typed) {
+  if (last.prompt === prompt && last.typed === typed) return last.result;
+  const a = chars(prompt);
+  const b = chars(typed);
+  const n = Math.min(a.length, b.length);
+  let head = 0;
+  while (head < n && a[head] === b[head]) head++;
+  let tail = 0;
+  while (tail < n - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+  const code = (c) => c.codePointAt(0);
+  const x = Int32Array.from(a.slice(head, a.length - tail), code);
+  const y = Int32Array.from(b.slice(head, b.length - tail), code);
+
+  // 每格是 (錯誤數, 正確字數)：先求錯誤最少，再求正確最多。
+  // 網站在打字過程中每次重繪都會算分，所以用型別陣列，650 字的段落也只要幾毫秒。
+  const w = y.length + 1;
+  let pe = new Int32Array(w).map((_, j) => j);
+  let pm = new Int32Array(w);
+  let ce = new Int32Array(w);
+  let cm = new Int32Array(w);
+  for (let i = 1; i <= x.length; i++) {
+    ce[0] = i;
+    cm[0] = 0;
+    for (let j = 1; j <= y.length; j++) {
+      const same = x[i - 1] === y[j - 1];
+      let e = pe[j - 1] + (same ? 0 : 1);
+      let m = pm[j - 1] + (same ? 1 : 0);
+      if (pe[j] + 1 < e || (pe[j] + 1 === e && pm[j] > m)) {
+        e = pe[j] + 1;
+        m = pm[j];
+      }
+      if (ce[j - 1] + 1 < e || (ce[j - 1] + 1 === e && cm[j - 1] > m)) {
+        e = ce[j - 1] + 1;
+        m = cm[j - 1];
+      }
+      ce[j] = e;
+      cm[j] = m;
+    }
+    [pe, ce] = [ce, pe];
+    [pm, cm] = [cm, pm];
+  }
+  last = { prompt, typed, result: [head + tail + pm[y.length], pe[y.length]] };
+  return last.result;
+}
+
+const correct = (sample) => diff(sample.prompt, sample.typed)[0];
+const errors = (sample) => diff(sample.prompt, sample.typed)[1];
 
 const minutes = (sample) => Math.max(sample.seconds, 1e-9) / 60;
 
@@ -49,10 +90,12 @@ export const METRICS = {
   },
   cpm_jp: {
     unit: "字/分", authoritative: true, note: "全商速度部門，1 級 70",
-    fn: (s) => Math.max(0, correct(s) - errors(s)) / minutes(s),
+    // 純字数 = 総字数 − エラー数：誤字、脱字、余分字各扣一字，錯字不會被扣兩次
+    fn: (s) => Math.max(0, chars(s.prompt).length - errors(s)) / minutes(s),
   },
   tasu: {
-    unit: "타수", authoritative: true, note: "워드프로세서 1급 300",
+    // 韓國通行的單位，但沒有認證機構訂門檻：워드프로세서 考文書編輯，不考打字速度
+    unit: "타수", authoritative: false, note: "韓文慣用單位，按字母鍵計數",
     fn: (s) => (jamoKeys(s) || s.keystrokes) / minutes(s),
   },
   kdph_ssc: {
@@ -111,6 +154,7 @@ export function score(sample, lang, metric) {
 export const allScores = (sample, lang) =>
   METRIC_IDS.map((id) => score(sample, lang, id));
 
+/** 正確率：1 − 錯誤數 / 題目字數，最低為 0。 */
 export const accuracy = (sample) =>
   Math.max(0, 1 - errors(sample) / Math.max(chars(sample.prompt).length, 1));
 

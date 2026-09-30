@@ -4,16 +4,17 @@
 `detect.check()` 拿觀測到的擊鍵去比對常模。`simulate` 反過來從常模抽樣產生擊鍵，
 主要用途是給偵測端當測試對手。
 
-每條判準的誤判率都在另一份獨立資料集（Aalto 136M Keystrokes，2,245 位受試者）上
+每條判準的誤判率都在另一份獨立資料集（Aalto 136M Keystrokes，2,500 位受試者）上
 量過，方法與數字見 METHOD.md。
 """
 
 from .detect import RULES, Report, check
-from .metrics import (DEFAULT_METRIC, METRICS, Session, all_scores,
-                      load_session, score)
+from .metrics import (DEFAULT_METRIC, METRICS, Session, accuracy, all_scores,
+                      load_session, parse_session, score, tqc_grade)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "check", "Report", "RULES",
-    "score", "all_scores", "Session", "load_session", "METRICS", "DEFAULT_METRIC",
+    "score", "all_scores", "accuracy", "tqc_grade", "Session", "parse_session",
+    "load_session", "METRICS", "DEFAULT_METRIC",
 ]

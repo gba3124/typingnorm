@@ -1,7 +1,9 @@
 /** JS 端自己的單元測試。跨語言一致性另見 vectors.test.js。 */
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import * as typingnorm from "./index.js";
 import { MIN_KEYSTROKES, RULES, check } from "./index.js";
 
 const robot = (n = 400, iki = 120, dwell = 80) => {
@@ -52,4 +54,10 @@ test("每條判準都帶著實測的誤判率", () => {
     assert.equal(typeof rule.falsePositive, "number");
     assert.ok(rule.falsePositive >= 0 && rule.falsePositive < 0.05);
   }
+});
+
+test("index.d.ts 宣告了每一個匯出，也沒有宣告不存在的東西", () => {
+  const dts = readFileSync(new URL("./index.d.ts", import.meta.url), "utf8");
+  const declared = [...dts.matchAll(/export declare (?:const|function) (\w+)/g)].map((m) => m[1]);
+  assert.deepEqual(declared.sort(), Object.keys(typingnorm).sort());
 });
